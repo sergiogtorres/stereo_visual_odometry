@@ -4,4 +4,9 @@ The baseline is extracted from the projection matrices.
 P = [ 0  fy cy Ty ] 
     [ 0  0  1  Tz ]
 
-\begin{bmatrix} X \\\ Y \end{bmatrix}
+```math
+  \begin{bmatrix} 
+    X \\ 
+    Y 
+  \end{bmatrix}
+```
