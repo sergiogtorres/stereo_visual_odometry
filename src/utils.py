@@ -50,16 +50,33 @@ class ImageHandler:
         self.poses_data = np.loadtxt(poses_path)
         #P_l, P_r = data.reshape(-1, 3, 4)  # Each row is a 3x4 projection matrix
 
-        self.K_left, self.P_left, self.K_right, self.P_right, self.baseline = self._load_KITTI_calibration(calibration_path)
+        (self.K_left, self.P_left,
+         self.K_right, self.P_right,
+         self.baseline, self.fx) = self._load_KITTI_calibration(calibration_path)
 
         if detector_flag == "sift":
             self.kp_detector = cv2.SIFT_create()
 
+        min_disp = 0
+        n_disp_factor = 5
+        num_disp = 16*n_disp_factor-min_disp
 
-        block = 11
-        P1 = block * block * 8
-        P2 = block * block * 32
-        self.disparity_estimator = cv2.StereoSGBM_create(minDisparity=0, numDisparities=32, blockSize=block, P1=P1, P2=P2)
+        block = 13
+        P1 = 8*3*block**2#block * block * 8
+        P2 = 32*3*block**2#block * block * 32
+
+
+        self.disparity_estimator = cv2.StereoSGBM_create(minDisparity=min_disp,
+                                                         numDisparities=num_disp,
+                                                         blockSize=block,
+                                                         P1=P1,
+                                                         P2=P2,
+                                                         disp12MaxDiff=1,
+                                                         uniquenessRatio=5,
+                                                         speckleWindowSize=50,
+                                                         speckleRange=10,
+                                                         preFilterCap=63,
+                                                         mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY)
 
         self.not_done = True
 
@@ -93,11 +110,28 @@ class ImageHandler:
 
         self.load_next_frame()
 
+
+    def _get_new_disparity(self):
+
+        return (
+            (self.disparity_estimator.compute(self.current_image_left,
+                                              self.current_image_right
+                                              ) / 16 ).astype(np.float32)
+        )
+
+    #def useSBGM(self):
+    #    window_size = 7
+    #    min_disp = 16
+
     @staticmethod
     def _update_current_prev_numpy(current, new):
 
         return np.copy(current), new
     def load_next_frame(self):
+        """
+        Since self.current_image_index starts at -1, this is used to load the first image as well.
+        :return:
+        """
 
         self.current_image_index += 1
 
@@ -121,33 +155,51 @@ class ImageHandler:
         (self.des_prev,
          self.des_current) = self._update_current_prev_numpy(self.des_current, des_new)
 
-        #(self.prev_disparity,
-        # self.current_disparity) = self._update_current_prev_numpy(self.current_disparity, self.get_new_disparity())
+        new_disparity = self._get_new_disparity()
+        new_disparity
+        (self.prev_disparity,
+         self.current_disparity) = self._update_current_prev_numpy(self.current_disparity, new_disparity)
 
-        #new_depth_map = None
+        new_depth_map = self.baseline * self.fx / self.current_disparity
 
+        (self.depth_map_prev,
+         self.depth_map_current) = self._update_current_prev_numpy(self.depth_map_current, new_depth_map)
 
-
-        #(self.depth_map_prev,
-        # self.depth_map_current) = self._update_current_prev_numpy(self.depth_map_current, new_depth_map)
-
+        #check if we are done with the dataset
         self.not_done = (self.current_image_index < self.number_of_images)
 
     def show_current_and_prev_frames(self):
 
+        bad_prev = self.prev_disparity == -1
+        bad_current = self.current_disparity == -1
+        disp_prev_masked = np.ma.masked_where(bad_prev, self.prev_disparity)
+        disp_current_masked = np.ma.masked_where(bad_current, self.current_disparity)
+        depth_prev_masked = np.ma.masked_where(bad_prev, self.depth_map_prev)
+        depth_current_masked = np.ma.masked_where(bad_current, self.depth_map_current)
+
         images = [self.prev_image_left, self.prev_image_right,
-                  self.current_image_left,self.current_image_right] #, self.prev_disparity, self.current_disparity
+                  self.current_image_left,self.current_image_right,
+                  disp_prev_masked, disp_current_masked,
+                  depth_prev_masked, depth_current_masked] #
+
         titles = ['prev_image_left', 'prev_image_right',
-                  'current_image_left','current_image_right'] #, 'prev_disparity', 'current_disparity'
+                  'current_image_left','current_image_right',
+                  'prev_disparity', 'current_disparity',
+                  'prev_depth', 'current_depth'] #
 
         plt.figure(figsize=(15, 8))  # Adjust figure size as needed
 
+
+
+        cmap = plt.cm.viridis
+        cmap.set_bad(color='red')
+
         for i, (image, title) in enumerate(zip(images, titles)):
-            plt.subplot(3, 2, i + 1)  # 3 rows, 2 columns
+            plt.subplot(4, 2, i + 1)  # 3 rows, 2 columns
             if i<4:
                 plt.imshow(image, cmap='gray')
-            else:  # Color
-                plt.imshow(image, cmap='plasma')  # or 'inferno', 'viridis', etc.
+            else:  # Color map
+                plt.imshow(image, cmap=cmap)  # or 'inferno', 'viridis', etc.
                 plt.colorbar(label='Disparity')
             plt.title(title + ' #' + str(self.current_image_index))
             plt.axis('off')
@@ -215,9 +267,13 @@ class ImageHandler:
 
         K_left = P_left[0:3, 0:3]
         K_right = P_right[0:3, 0:3]
+        _left_and_right_K_similar = np.allclose(K_left, K_right)
 
-        assert np.allclose(K_left, K_right), "the left and right camera intrinsics are different"
-
+        assert _left_and_right_K_similar, "the left and right camera intrinsics are different"
+        if _left_and_right_K_similar:
+            fx = K_left[0,0]
+        else:
+            fx = None
 
         mask = np.full(P_left.shape, True)
         mask[0, 3] = False
@@ -226,11 +282,11 @@ class ImageHandler:
         assert _baseline_is_only_difference, ("The projection matrices of the left and right camera "
                                                           "differ by more than just a horizontal baseline")
         if _baseline_is_only_difference:
-            baseline = np.abs(P_right[0, 3])
+            baseline = - P_right[0, 3] / fx
         else:
             baseline = None
 
-        return K_left, P_left, K_right, P_right, baseline
+        return K_left, P_left, K_right, P_right, baseline, fx
 
 
     @staticmethod

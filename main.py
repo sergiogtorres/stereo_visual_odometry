@@ -31,6 +31,7 @@ if __name__ == "__main__":
         # II. Feature Matching
 
         image_handler.match_current_frame_with_prev()
+        image_handler.show_current_and_prev_frames()
 
         matches = image_handler.current_matches #match_features_dataset(des_list, match_features)
 

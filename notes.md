@@ -1,4 +1,4 @@
-The baseline is extracted from the projection matrices. 
+The baseline is extracted from the projection matrices. Assuming no rotation, only relative translation between cameras:
 
 ```math
   P = 
@@ -8,3 +8,7 @@ The baseline is extracted from the projection matrices.
     0  & 0  & 1  & T_z
   \end{bmatrix}
 ```
+
+If we only have horizontal translation, then T_y, T_z are zero.
+
+When we apply [...]
