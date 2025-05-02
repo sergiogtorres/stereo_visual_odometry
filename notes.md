@@ -3,8 +3,8 @@ The baseline is extracted from the projection matrices.
 ```math
   P = 
   \begin{bmatrix} 
-    fx & 0  & cx & Tx  \\ 
-    0  & fy & cy & T_y \\ 
-    0  & 0  & 1  & Tz
+    f_x & 0  & c_x & T_x  \\ 
+    0  & f_y & c_y & T_y \\ 
+    0  & 0  & 1  & T_z
   \end{bmatrix}
 ```
