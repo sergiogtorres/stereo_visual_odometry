@@ -15,7 +15,10 @@ import src.motion as motion
 
 
 
-class ImageLoader:
+class ImageHandler:
+    """
+    Left camera used as the frame of reference throughout
+    """
 
     def __init__(self, project_root_path, folder_KITTI, detector_flag ="sift"):
 
@@ -47,16 +50,16 @@ class ImageLoader:
         self.poses_data = np.loadtxt(poses_path)
         #P_l, P_r = data.reshape(-1, 3, 4)  # Each row is a 3x4 projection matrix
 
-        self.K_left, self.P_left, self.K_right, self.P_right = self._load_KITTI_calibration(calibration_path)
+        self.K_left, self.P_left, self.K_right, self.P_right, self.baseline = self._load_KITTI_calibration(calibration_path)
 
         if detector_flag == "sift":
             self.kp_detector = cv2.SIFT_create()
 
 
-        #block = 11
-        #P1 = block * block * 8
-        #P2 = block * block * 32
-        #self.disparity_estimator = cv2.StereoSGBM_create(minDisparity=0, numDisparities=32, blockSize=block, P1=P1, P2=P2)
+        block = 11
+        P1 = block * block * 8
+        P2 = block * block * 32
+        self.disparity_estimator = cv2.StereoSGBM_create(minDisparity=0, numDisparities=32, blockSize=block, P1=P1, P2=P2)
 
         self.not_done = True
 
@@ -85,7 +88,7 @@ class ImageLoader:
 
         self.trajectory = []
 
-        self.K_left_inv = np.linalv.inv(self.K_left)
+        self.K_left_inv = np.linalg.inv(self.K_left)
 
 
         self.load_next_frame()
@@ -110,7 +113,7 @@ class ImageLoader:
         (self.prev_image_right,
          self.current_image_right) = self._update_current_prev_numpy(self.current_image_right, new_img_right)
 
-        kp_new, des_new = self.detect_current_frame(self)
+        kp_new, des_new = self.detect_current_frame()
 
         (self.kp_prev,
          self.kp_current) = self._update_current_prev_numpy(self.kp_current, kp_new)
@@ -130,17 +133,17 @@ class ImageLoader:
 
         self.not_done = (self.current_image_index < self.number_of_images)
 
-    def show_prev_current_img_disp_map(self):
+    def show_current_and_prev_frames(self):
 
-        images = [self.prev_image_left, self.current_image_left,
-                  self.prev_image_right, self.current_image_right] #, self.prev_disparity, self.current_disparity
-        titles = ['prev_image_left', 'current_image_left',
-                  'prev_image_right', 'current_image_right'] #, 'prev_disparity', 'current_disparity'
+        images = [self.prev_image_left, self.prev_image_right,
+                  self.current_image_left,self.current_image_right] #, self.prev_disparity, self.current_disparity
+        titles = ['prev_image_left', 'prev_image_right',
+                  'current_image_left','current_image_right'] #, 'prev_disparity', 'current_disparity'
 
         plt.figure(figsize=(15, 8))  # Adjust figure size as needed
 
         for i, (image, title) in enumerate(zip(images, titles)):
-            plt.subplot(2, 3, i + 1)  # 2 rows, 3 columns
+            plt.subplot(3, 2, i + 1)  # 3 rows, 2 columns
             if i<4:
                 plt.imshow(image, cmap='gray')
             else:  # Color
@@ -206,9 +209,29 @@ class ImageLoader:
         K_right: intrinsic matrix for the right camera (3x3)
         P_right: projection matrix for the right camera (3x4)
         """
+        raw_calib_data = np.loadtxt(path, dtype=np.float32, delimiter=' ')
+        P_left = np.reshape(raw_calib_data[0], (3, 4))
+        P_right = np.reshape(raw_calib_data[1], (3, 4))
+
+        K_left = P_left[0:3, 0:3]
+        K_right = P_right[0:3, 0:3]
+
+        assert np.allclose(K_left, K_right), "the left and right camera intrinsics are different"
 
 
-        return K_left, P_left, K_right, P_right
+        mask = np.full(P_left.shape, True)
+        mask[0, 3] = False
+
+        _baseline_is_only_difference = np.allclose(P_left[mask], P_right[mask])
+        assert _baseline_is_only_difference, ("The projection matrices of the left and right camera "
+                                                          "differ by more than just a horizontal baseline")
+        if _baseline_is_only_difference:
+            baseline = np.abs(P_right[0, 3])
+        else:
+            baseline = None
+
+        return K_left, P_left, K_right, P_right, baseline
+
 
     @staticmethod
     def _load_KITTI_poses(path):
