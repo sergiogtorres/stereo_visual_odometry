@@ -12,12 +12,14 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import src.features as features
 import src.motion as motion
+import src.visualization as visualization
 
 
 
 class ImageHandler:
     """
     Left camera used as the frame of reference throughout
+    TODO: Refactor so this class only handles the image loading
     """
 
     def __init__(self, project_root_path, folder_KITTI, detector_flag ="sift"):
@@ -26,15 +28,18 @@ class ImageHandler:
 
 
         # paths
-        image_left_dir = os.path.join(project_root_path, folder_KITTI, 'image_l')
-        image_right_dir = os.path.join(project_root_path, folder_KITTI, 'image_r')
-        poses_path = os.path.join(project_root_path, folder_KITTI, 'poses.txt')
-        calibration_path = os.path.join(project_root_path, folder_KITTI, 'calib.txt')
+        self.project_root_path = project_root_path
+        image_left_dir = os.path.join(self.project_root_path, folder_KITTI, 'image_l')
+        image_right_dir = os.path.join(self.project_root_path, folder_KITTI, 'image_r')
+        poses_path = os.path.join(self.project_root_path, folder_KITTI, 'poses.txt')
+        calibration_path = os.path.join(self.project_root_path, folder_KITTI, 'calib.txt')
 
         self.image_paths_left = sorted(os.path.join(image_left_dir, file) for file in sorted(os.listdir(image_left_dir)))
         self.image_paths_right = sorted(os.path.join(image_right_dir, file) for file in sorted(os.listdir(image_right_dir)))
-
-
+        self.output_video_path = os.path.join(self.project_root_path, 'output/video')
+        self.output_video_path_matches = os.path.join(self.project_root_path, 'output/video_matches')
+        self.frame_name = "frame_and_depth"
+        self.frame_name_matches = "matches"
 
         assert len(self.image_paths_left) == len(self.image_paths_right), "the number of left and right images is not equal"
 
@@ -79,6 +84,7 @@ class ImageHandler:
                                                          mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY)
 
         self.not_done = True
+        self.save_out_video = True
 
         self.prev_image_left        = None
         self.current_image_left     = None
@@ -94,6 +100,9 @@ class ImageHandler:
         self.des_prev               = None
         self.des_current            = None
         self.match                  = None
+
+
+        self.current_pos            = None
 
         self.want_to_filter         = False
 
@@ -125,7 +134,6 @@ class ImageHandler:
 
     @staticmethod
     def _update_current_prev_numpy(current, new):
-
         return np.copy(current), new
     def load_next_frame(self):
         """
@@ -147,16 +155,8 @@ class ImageHandler:
         (self.prev_image_right,
          self.current_image_right) = self._update_current_prev_numpy(self.current_image_right, new_img_right)
 
-        kp_new, des_new = self.detect_current_frame()
-
-        (self.kp_prev,
-         self.kp_current) = self._update_current_prev_numpy(self.kp_current, kp_new)
-
-        (self.des_prev,
-         self.des_current) = self._update_current_prev_numpy(self.des_current, des_new)
-
         new_disparity = self._get_new_disparity()
-        new_disparity
+
         (self.prev_disparity,
          self.current_disparity) = self._update_current_prev_numpy(self.current_disparity, new_disparity)
 
@@ -165,8 +165,31 @@ class ImageHandler:
         (self.depth_map_prev,
          self.depth_map_current) = self._update_current_prev_numpy(self.depth_map_current, new_depth_map)
 
+        #print("\n\nbefore updating keypoints:")
+        #self.print_current_and_prev_kp_des()
+
+        kp_new, des_new = self.detect_current_frame()
+
+        (self.kp_prev, self.kp_current) = (self.kp_current, kp_new)
+        (self.des_prev, self.des_current) = (self.des_current, des_new)
+        #print("\n\nafter updating keypoints:")
+        #self.print_current_and_prev_kp_des()
+
+
         #check if we are done with the dataset
-        self.not_done = (self.current_image_index < self.number_of_images)
+        print(f"current_image_index:{self.current_image_index}"
+              f"self.not_done:{self.not_done}")
+        self.not_done = (self.current_image_index < 50) #(self.current_image_index < self.number_of_images)
+    def print_types_current_and_prev_frames(self):
+        print(f"self.prev_image_left:\n{self.prev_image_left}\n"
+              f"self.prev_image_right:\n{self.prev_image_right}\n"
+              f"self.current_image_left:\n{self.current_image_left}\n"
+              f"self.current_image_right:\n{self.current_image_right}\n")
+    def print_current_and_prev_kp_des(self):
+        print(f"self.kp_prev:\n{self.kp_prev}\n"
+              f"self.kp_current:\n{self.kp_current}\n"
+              f"self.des_prev:\n{self.des_prev}\n"
+              f"self.des_current:\n{self.des_current}\n")
 
     def show_current_and_prev_frames(self):
 
@@ -178,24 +201,27 @@ class ImageHandler:
         depth_current_masked = np.ma.masked_where(bad_current, self.depth_map_current)
 
         images = [self.prev_image_left, self.prev_image_right,
-                  self.current_image_left,self.current_image_right,
+                  self.current_image_left, self.current_image_right,
                   disp_prev_masked, disp_current_masked,
-                  depth_prev_masked, depth_current_masked] #
+                  depth_prev_masked, depth_current_masked,
+                  np.log1p(depth_prev_masked), np.log1p(depth_current_masked)] #
 
         titles = ['prev_image_left', 'prev_image_right',
                   'current_image_left','current_image_right',
                   'prev_disparity', 'current_disparity',
-                  'prev_depth', 'current_depth'] #
+                  'prev_depth', 'current_depth',
+                  'log prev_depth', 'log current_depth'] #
 
-        plt.figure(figsize=(15, 8))  # Adjust figure size as needed
+        plt.figure(num='previous and current frames, disparities and depth'+str(self.current_image_index),
+                   figsize=(15, 8))  # Adjust figure size as needed
 
+        plt.clf()  # Clear previous contents, if any
 
-
-        cmap = plt.cm.viridis
+        cmap = plt.cm.viridis_r#gray_r#viridis
         cmap.set_bad(color='red')
 
         for i, (image, title) in enumerate(zip(images, titles)):
-            plt.subplot(4, 2, i + 1)  # 3 rows, 2 columns
+            plt.subplot(5, 2, i + 1)  # 3 rows, 2 columns
             if i<4:
                 plt.imshow(image, cmap='gray')
             else:  # Color map
@@ -206,6 +232,11 @@ class ImageHandler:
 
         plt.tight_layout()
         plt.show()
+
+        if self.save_out_video:
+            os.makedirs(self.output_video_path, exist_ok=True)
+            plt.savefig(f'{self.output_video_path}/{self.frame_name}_{self.current_image_index:04d}.png')
+            plt.close()
 
         if False:
             # Show the image
@@ -230,16 +261,28 @@ class ImageHandler:
         """
         kp_new, des_new = features.extract_features_from_image(self.current_image_left, self.kp_detector)#self.kp_current, self.des_current =
         return kp_new, des_new
-    def match_current_frame_with_prev(self):
+    def match_prev_frame_with_current(self):
         self.match = features.match_features(self.des_prev, self.des_current, ratio_test=False)
-        if self.want_to_filter:
-            self.match = features.filter_by_distance(self.match, 9999999999)
+        #if self.want_to_filter:
+        #    self.match = features.filter_by_distance(self.match, 9999999999)
 
     def estimate_motion_current_frame(self):
-        rmat, tvec, image1_points, image2_points = \
-            motion.estimate_motion(self.match, self.kp_prev, self.kp_current, self.K_left_inv, depth1=None, extra_output=False)
+        (rmat, tvec,
+         image1_points, image2_points,
+         success, inliers,
+         object_points_prev, image_points_current,
+         rvec) = \
+            motion.estimate_motion(self.match,
+                                   self.kp_prev, self.kp_current,
+                                   self.K_left, self.K_left_inv,
+                                   depth1=self.depth_map_current,
+                                   extra_output=True)
 
-        return rmat, tvec, image1_points, image2_points
+        # TODO: move show_reprojection_mismatch() elsewhere (e.g. explicit call in __main__)
+        #visualization.show_reprojection_mismatch(object_points_prev, image_points_current, rvec, tvec, self.K_left,
+        #                                         self.current_image_index)
+
+        return rmat, tvec, image1_points, image2_points#, object_points
 
     def estimate_current_position(self):
         rmat, tvec, image1_points, image2_points = self.estimate_motion_current_frame()
@@ -248,8 +291,11 @@ class ImageHandler:
         Rt = np.vstack((Rt, np.array([0, 0, 0, 1])))
         Ci = np.linalg.inv(Rt)
 
-        self.current_pos = motion.transformation_matrix_to_pos(Ci, self.current_pose_matrix, self.pos_hom_o)
+        self.current_pose_matrix, self.current_pos = (
+            motion.transformation_matrix_to_pos(Ci, self.current_pose_matrix, self.pos_hom_o))
         self.trajectory.append(self.current_pos)
+
+
     @staticmethod
     def _load_KITTI_calibration(path):
         """
@@ -296,8 +342,16 @@ class ImageHandler:
         :param path: Path to poses.txt
         :return: poses, a list of 4x4 [R|t] np.arrays representing the poses
         """
+        data = np.loadtxt(path, dtype=np.float64)  # shape: (N, 12)
+        poses = np.reshape(data, (-1, 3, 4))  # shape: (N, 3, 4)
 
-        return poses  # List of 4x4 [R|t] np.arrays
+        # Add the bottom row [0, 0, 0, 1] to each 3x4 matrix to make it 4x4
+        bottom = np.array([0, 0, 0, 1], dtype=np.float64)
+        bottom = np.tile(bottom, (poses.shape[0], 1, 1))  # shape: (N, 1, 4)
+
+        poses_hom = np.concatenate([poses, bottom], axis=1)  # shape: (N, 4, 4)
+        return poses, poses_hom
+        #return poses  # List of 4x4 [R|t] np.arrays
 
 
 

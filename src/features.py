@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
+import os
 
 
 
@@ -38,6 +39,7 @@ def match_features(des1, des2, ratio_test=False):
     :param des2: list of descriptors from the second image
     :param ratio_test:
     :return: match: list of matched features
+    TODO: take matcher definition outside
     """
 
     # Initialize FLANN-based matcher
@@ -87,7 +89,7 @@ def filter_by_distance(match, dist_threshold):
 
     return filtered_match
 
-def show_matches(image1, kp1, image2, kp2, match):
+def show_matches(image1, kp1, image2, kp2, match, current_image_index, image_handler):
     """
     Visualizes the matches bwtween two images
     :param image1: first image
@@ -99,7 +101,15 @@ def show_matches(image1, kp1, image2, kp2, match):
     """
 
     image_matches = cv2.drawMatches(image1, kp1, image2, kp2, match,None)
+    plt.figure("matches"+str(current_image_index))
+    plt.clf()  # Clear previous contents, if any
     plt.imshow(image_matches)
+
+    if image_handler.save_out_video:
+        os.makedirs(image_handler.output_video_path_matches, exist_ok=True)
+        plt.savefig(f'{image_handler.output_video_path_matches}/'
+                    f'{image_handler.frame_name_matches}_{image_handler.current_image_index:04d}.png')
+        plt.close()
 
     return
 

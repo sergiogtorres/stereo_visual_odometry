@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 import seaborn
-def estimate_motion(match, kp1, kp2, k_inv, depth1=None, extra_output=False):
+def estimate_motion(match, kp1, kp2, k, k_inv, depth1=None, extra_output=False):
     """
     TODO: refactor from using depth map into using cv2.triangulatePoints()
     Estimates camera motion from the first to the second frame
@@ -41,7 +41,7 @@ def estimate_motion(match, kp1, kp2, k_inv, depth1=None, extra_output=False):
         x2 = int(x2_subpix)
 
         if depth1 is not None:
-            zw1 = depth1[y1, x1]
+            zw1 = depth1[y1, x1]#*np.random.rand()#*20
             if zw1 < 1000:
                 pos_feature_cam = np.array([[x1],
                                     [y1],
@@ -63,23 +63,24 @@ def estimate_motion(match, kp1, kp2, k_inv, depth1=None, extra_output=False):
             #image_point = np.array([x2, y2])    #current frame
 
             #object_points.append(object_point)
-            #image_points.append(image_point)
+            #image_points.append(image_point)not implemented
 
     object_points = np.array(object_points)
     image_points = np.array(image_points, dtype=float)
+    print(len(object_points), len(image_points))
     success, rvec, tvec, inliers = cv2.solvePnPRansac(object_points, image_points, k, None)
     rmat, _ = cv2.Rodrigues(rvec)  # Convert rotation vector to matrix
 
 
     if extra_output:
-        out = rmat, tvec, image1_points, image2_points, success, inliers, object_points, image_points, rvec
+        out = rmat, tvec, image1_points, image2_points, success, inliers, object_points, image_points, rvec #image_points: ignore
     else:
         out = rmat, tvec, image1_points, image2_points
     return out
 
 
 
-def transformation_matrix_to_pos(Ci, matrix_prev, pos_hom_o):
+def transformation_matrix_to_pos(Ci, matrix_prev, pos_hom_o=np.array([[0],[0],[0],[1]])):
     """
     Takes the cummulative transformation matrix Ci and extracts the current pose with respect to the original point,
     in the camera's frame of reference.
@@ -88,8 +89,10 @@ def transformation_matrix_to_pos(Ci, matrix_prev, pos_hom_o):
     :param pos_hom_o:
     :return:
     """
+
+    print(f"Ci:\n{Ci}")
     new_matrix = matrix_prev @ Ci
 
     pos_hom_i = (new_matrix @ pos_hom_o)[:, 0]
 
-    return pos_hom_i
+    return new_matrix, pos_hom_i
