@@ -14,6 +14,8 @@ import src.features as features
 import src.motion as motion
 import src.visualization as visualization
 
+from datetime import datetime
+
 
 
 class ImageHandler:
@@ -22,22 +24,20 @@ class ImageHandler:
     TODO: Refactor so this class only handles the image loading
     """
 
-    def __init__(self, project_root_path, folder_KITTI, detector_flag ="sift"):
+    def __init__(self, project_root_path, folder_KITTI, detector_flag ="sift", frames_to_use = None):
 
-
-
-
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         # paths
         self.project_root_path = project_root_path
         image_left_dir = os.path.join(self.project_root_path, folder_KITTI, 'image_l')
         image_right_dir = os.path.join(self.project_root_path, folder_KITTI, 'image_r')
-        poses_path = os.path.join(self.project_root_path, folder_KITTI, 'poses.txt')
+        self.poses_path = os.path.join(self.project_root_path, folder_KITTI, 'poses.txt')
         calibration_path = os.path.join(self.project_root_path, folder_KITTI, 'calib.txt')
 
         self.image_paths_left = sorted(os.path.join(image_left_dir, file) for file in sorted(os.listdir(image_left_dir)))
         self.image_paths_right = sorted(os.path.join(image_right_dir, file) for file in sorted(os.listdir(image_right_dir)))
-        self.output_video_path = os.path.join(self.project_root_path, 'output/video')
-        self.output_video_path_matches = os.path.join(self.project_root_path, 'output/video_matches')
+        self.output_video_path = os.path.join(self.project_root_path, f'output_{timestamp}/video')
+        self.output_video_path_matches = os.path.join(self.project_root_path, f'output_{timestamp}/video_matches')
         self.frame_name = "frame_and_depth"
         self.frame_name_matches = "matches"
 
@@ -45,6 +45,11 @@ class ImageHandler:
 
 
         self.number_of_images = len(self.image_paths_left)
+        if frames_to_use is not None:
+            self.final_frame = min(frames_to_use, self.number_of_images)
+        else:
+            self.final_frame = self.number_of_images
+
 
         print(f"Number of images: {self.number_of_images}")
 
@@ -52,7 +57,7 @@ class ImageHandler:
         self.current_image_index = -1
 
 
-        self.poses_data = np.loadtxt(poses_path)
+        self.poses_data = np.loadtxt(self.poses_path)
         #P_l, P_r = data.reshape(-1, 3, 4)  # Each row is a 3x4 projection matrix
 
         (self.K_left, self.P_left,
@@ -179,7 +184,7 @@ class ImageHandler:
         #check if we are done with the dataset
         print(f"current_image_index:{self.current_image_index}"
               f"self.not_done:{self.not_done}")
-        self.not_done = (self.current_image_index < 50) #(self.current_image_index < self.number_of_images)
+        self.not_done = (self.current_image_index < self.final_frame) #(self.current_image_index < self.number_of_images)
     def print_types_current_and_prev_frames(self):
         print(f"self.prev_image_left:\n{self.prev_image_left}\n"
               f"self.prev_image_right:\n{self.prev_image_right}\n"
@@ -235,7 +240,7 @@ class ImageHandler:
 
         if self.save_out_video:
             os.makedirs(self.output_video_path, exist_ok=True)
-            plt.savefig(f'{self.output_video_path}/{self.frame_name}_{self.current_image_index:04d}.png')
+            plt.savefig(f'{self.output_video_path}/{self.frame_name}_{self.current_image_index:04d}.png', dpi=200)
             plt.close()
 
         if False:

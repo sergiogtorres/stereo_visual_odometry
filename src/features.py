@@ -108,7 +108,7 @@ def show_matches(image1, kp1, image2, kp2, match, current_image_index, image_han
     if image_handler.save_out_video:
         os.makedirs(image_handler.output_video_path_matches, exist_ok=True)
         plt.savefig(f'{image_handler.output_video_path_matches}/'
-                    f'{image_handler.frame_name_matches}_{image_handler.current_image_index:04d}.png')
+                    f'{image_handler.frame_name_matches}_{image_handler.current_image_index:04d}.png', dpi=200)
         plt.close()
 
     return

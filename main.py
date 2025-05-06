@@ -61,19 +61,19 @@ if __name__ == "__main__":
 
     trajectory = np.array(trajectory)#estimate_trajectory(estimate_motion, matches, kp_list, k, depth_maps=depth_maps, debug=False)
 
-    trajectory_x_right_y_front_z_up = visualization.trajectory_to_xyz(trajectory)
-    visualization.visualize_trajectory(trajectory_x_right_y_front_z_up)
+    #trajectory_x_right_y_front_z_up = visualization.trajectory_to_xyz(trajectory)
+    #visualization.visualize_trajectory(trajectory_x_right_y_front_z_up)
 
     plt.figure('x-z estimated and GT')
-    plt.scatter(trajectory[:, 0], trajectory[:, 2], marker='o')
+    plt.plot(trajectory[:, 0], trajectory[:, 2])
 
-    poses_GT, _ = image_handler._load_KITTI_poses()
+    poses_GT, _ = image_handler._load_KITTI_poses(image_handler.poses_path)
     poses_manual = []
     for element_ in poses_GT:
         xyz = element_[:, -1]
         poses_manual.append(xyz)
-
-    plt.scatter(poses_manual[:, 0], poses_manual[:, 2], marker='o', color='red')
+    poses_manual = np.array(poses_manual)
+    plt.plot(poses_manual[:, 0], poses_manual[:, 2], color='red')
 
     # images = image_handler.images
     # depth_maps = image_handler.depth_maps
