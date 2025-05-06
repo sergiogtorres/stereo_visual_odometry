@@ -11,6 +11,14 @@ import sys
 import glob
 matplotlib.use('TkAgg')  # Or 'Qt5Agg', 'WebAgg', etc.
 
+# TODO: use optical flow for most frames, and keypoint matching for keyframes (e.g. Kalman Filter update step)
+# TODO: with optical flow tracking of features, sparse triangulation (instead of depth maps) makes more sense
+#  (
+#  without optical flow, there would need to be 2 matching steps per frame:
+#  current_left <-> current_right
+#  current_left <-> previous_left
+#  (triangulation requires left&right views, +1 view to get the [R|t] transformation from previous_left to current_left)
+#  )
 if __name__ == "__main__":
 
     trajectory = []
@@ -19,7 +27,7 @@ if __name__ == "__main__":
     print(root_dir_path)
     #if 'image_handler' not in globals():
     #    image_handler = ImageHandler(root_dir_path)
-    image_handler = ImageHandler(root_dir_path, folder_KITTI)
+    image_handler = ImageHandler(root_dir_path, folder_KITTI, create_plots=False)
 
     iteration = 0
     #k = image_handler.k
@@ -36,14 +44,16 @@ if __name__ == "__main__":
         # II. Feature Matching
 
         image_handler.match_prev_frame_with_current()
-        image_handler.show_current_and_prev_frames()
-        show_matches(image_handler.prev_image_left,
-                     image_handler.kp_prev,
-                     image_handler.current_image_left,
-                     image_handler.kp_current,
-                     image_handler.match,
-                     image_handler.current_image_index,
-                     image_handler)
+        if image_handler.create_plots:
+            image_handler.show_current_and_prev_frames()
+            show_matches(image_handler.prev_image_left,
+                         image_handler.kp_prev,
+                         image_handler.current_image_left,
+                         image_handler.kp_current,
+                         image_handler.match,
+                         image_handler.current_image_index,
+                         image_handler)
+
 
         #matches = image_handler.current_matches #match_features_dataset(des_list, match_features)
 
@@ -56,8 +66,10 @@ if __name__ == "__main__":
 
         iteration += 1
 
-    visualization.make_output_video(image_handler.output_video_path, image_handler.frame_name)
-    visualization.make_output_video(image_handler.output_video_path_matches, image_handler.frame_name_matches)
+
+    if image_handler.create_plots:
+        visualization.make_output_video(image_handler.output_video_path, image_handler.frame_name)
+        visualization.make_output_video(image_handler.output_video_path_matches, image_handler.frame_name_matches)
 
     trajectory = np.array(trajectory)#estimate_trajectory(estimate_motion, matches, kp_list, k, depth_maps=depth_maps, debug=False)
 
@@ -65,6 +77,7 @@ if __name__ == "__main__":
     #visualization.visualize_trajectory(trajectory_x_right_y_front_z_up)
 
     plt.figure('x-z estimated and GT')
+    plt.axis('equal')
     plt.plot(trajectory[:, 0], trajectory[:, 2])
 
     poses_GT, _ = image_handler._load_KITTI_poses(image_handler.poses_path)

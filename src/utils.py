@@ -24,7 +24,7 @@ class ImageHandler:
     TODO: Refactor so this class only handles the image loading
     """
 
-    def __init__(self, project_root_path, folder_KITTI, detector_flag ="sift", frames_to_use = None):
+    def __init__(self, project_root_path, folder_KITTI, detector_flag ="sift", frames_to_use = None, create_plots=True):
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         # paths
@@ -48,7 +48,7 @@ class ImageHandler:
         if frames_to_use is not None:
             self.final_frame = min(frames_to_use, self.number_of_images)
         else:
-            self.final_frame = self.number_of_images
+            self.final_frame = self.number_of_images - 1
 
 
         print(f"Number of images: {self.number_of_images}")
@@ -90,6 +90,10 @@ class ImageHandler:
 
         self.not_done = True
         self.save_out_video = True
+        self.create_plots = create_plots
+
+        if self.save_out_video != self.create_plots:
+            print(f"be careful with the following flags: self.save_out_video, self.crete_plots: {self.save_out_video, self.create_plots}")
 
         self.prev_image_left        = None
         self.current_image_left     = None
@@ -184,6 +188,7 @@ class ImageHandler:
         #check if we are done with the dataset
         print(f"current_image_index:{self.current_image_index}"
               f"self.not_done:{self.not_done}")
+
         self.not_done = (self.current_image_index < self.final_frame) #(self.current_image_index < self.number_of_images)
     def print_types_current_and_prev_frames(self):
         print(f"self.prev_image_left:\n{self.prev_image_left}\n"
