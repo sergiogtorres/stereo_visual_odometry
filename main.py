@@ -22,7 +22,7 @@ matplotlib.use('TkAgg')  # Or 'Qt5Agg', 'WebAgg', etc.
 if __name__ == "__main__":
 
     trajectory = []
-    root_dir_path = os.path.dirname(os.path.realpath(__file__))#'F:\\projects\\1.start_projects_here\\stereo_visual_odometry'
+    root_dir_path = os.path.dirname(os.path.realpath(__file__))
     folder_KITTI = os.path.join(root_dir_path, "data/KITTI_sequence_10")
     print(root_dir_path)
     #if 'image_handler' not in globals():
