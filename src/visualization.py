@@ -4,8 +4,6 @@ import cv2
 import glob
 import os
 
-
-
 def show_reprojection_mismatch(object_points_prev, image_points_current, rvec, tvec, k, current_image_index):
     """
     This function only checks that the rvec, tvec transformation of object_points (3D) from prev -> image_points (2D)
