@@ -15,7 +15,6 @@ def extract_features_from_image(image, detector):
 
     kp, des = detector.detectAndCompute(image, None)
 
-    ### END CODE HERE ###
 
     return kp, des
 
@@ -62,7 +61,6 @@ def match_features(des1, des2, ratio_test=False):
     # Sort matches by distance
     match = sorted(matches, key=lambda x: x.distance)
 
-    ### END CODE HERE ###
 
     return match
 
@@ -78,14 +76,12 @@ def filter_by_distance(match, dist_threshold):
 
     filtered_match = []
 
-    ### START CODE HERE ###
     for m in match:
         # print (m.distance)
         # print("m.distance: ", m.distance)
         if m.distance <= dist_threshold:
             filtered_match.append(m)
 
-    ### END CODE HERE ###
 
     return filtered_match
 
