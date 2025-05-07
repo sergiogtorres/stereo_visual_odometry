@@ -36,8 +36,8 @@ class ImageHandler:
 
         self.image_paths_left = sorted(os.path.join(image_left_dir, file) for file in sorted(os.listdir(image_left_dir)))
         self.image_paths_right = sorted(os.path.join(image_right_dir, file) for file in sorted(os.listdir(image_right_dir)))
-        self.output_video_path = os.path.join(self.project_root_path, f'output_{timestamp}/video')
-        self.output_video_path_matches = os.path.join(self.project_root_path, f'output_{timestamp}/video_matches')
+        self.output_video_path = os.path.join(self.project_root_path, f'output/output_{timestamp}/video')
+        self.output_video_path_matches = os.path.join(self.project_root_path, f'output/output_{timestamp}/video_matches')
         self.frame_name = "frame_and_depth"
         self.frame_name_matches = "matches"
 

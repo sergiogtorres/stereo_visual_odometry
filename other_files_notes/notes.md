@@ -12,3 +12,4 @@ The baseline is extracted from the projection matrices. Assuming no rotation, on
 If we only have horizontal translation, then T_y, T_z are zero.
 
 When we apply [...]
+# TODO add explanation for VO pipeline.
